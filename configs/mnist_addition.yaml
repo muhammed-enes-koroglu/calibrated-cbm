@@ -1,0 +1,29 @@
+# MNIST-Addition, joint CBM. Override any field on the command line, e.g.
+#   python scripts/train.py fit --config configs/mnist_addition.yaml --model.mode independent
+seed_everything: 0
+trainer:
+  max_epochs: 10
+  accelerator: auto
+  logger:
+    class_path: lightning.pytorch.loggers.CSVLogger
+    init_args:
+      save_dir: runs
+      name: mnist_addition
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: val/loss
+        filename: best
+model:
+  n_concepts: 20
+  n_classes: 19
+  encoder: mnist_pair
+  mode: joint
+  concept_weight: 1.0
+  lr: 0.001
+data:
+  class_path: cbm_calib.data.MNISTAdditionDataModule
+  init_args:
+    data_dir: data
+    batch_size: 256
+    concept_noise: 0.0

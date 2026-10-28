@@ -1,0 +1,38 @@
+# CUB on cached ResNet-50 features (run scripts/extract_cub_features.py first).
+#   python scripts/train.py fit --config configs/cub.yaml --model.mode joint --model.concept_weight 0.1
+seed_everything: 0
+trainer:
+  max_epochs: 100
+  accelerator: auto
+  logger:
+    class_path: lightning.pytorch.loggers.CSVLogger
+    init_args:
+      save_dir: runs
+      name: cub
+  callbacks:
+    - class_path: lightning.pytorch.callbacks.ModelCheckpoint
+      init_args:
+        monitor: val/loss
+        filename: best
+    - class_path: lightning.pytorch.callbacks.EarlyStopping
+      init_args:
+        monitor: val/loss
+        patience: 15
+model:
+  n_concepts: 112
+  n_classes: 200
+  encoder: mlp
+  encoder_kwargs:
+    in_features: 2048
+    hidden_dim: 256
+    dropout: 0.2
+  mode: joint
+  concept_weight: 1.0
+  lr: 0.001
+  weight_decay: 0.0001
+data:
+  class_path: cbm_calib.data.CUBDataModule
+  init_args:
+    features_dir: data/cub_features
+    label_type: denoised
+    batch_size: 256
