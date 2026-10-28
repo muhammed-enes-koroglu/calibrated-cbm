@@ -39,17 +39,25 @@ def load_cub(cub_dir: Path):
         attr_file = cub_dir.parent / "attributes.txt"
     attr_names = [line.split(" ", 1)[1] for line in attr_file.read_text().splitlines()]
 
-    table = read_table(cub_dir / "attributes" / "image_attribute_labels.txt", 3)
+    table = read_table(cub_dir / "attributes" / "image_attribute_labels.txt", 4)
     raw = np.zeros((len(paths), len(attr_names)), dtype=np.float32)
     raw[table[:, 0] - 1, table[:, 1] - 1] = table[:, 2]
-    return paths, is_train, labels, attr_names, raw
+    # Certainty 1 means "not visible".
+    not_visible = np.zeros_like(raw, dtype=bool)
+    not_visible[table[:, 0] - 1, table[:, 1] - 1] = table[:, 3] == 1
+    return paths, is_train, labels, attr_names, raw, not_visible
 
 
-def select_concepts(raw, labels, train_idx, min_classes=10):
+def select_concepts(raw, not_visible, labels, train_idx, min_classes=10):
+    """Majority vote per class as in Koh et al.'s code: "absent" labels marked not visible
+    do not count as votes, and ties count as present."""
     n_classes = labels.max() + 1
     class_attr = np.zeros((n_classes, raw.shape[1]), dtype=np.float32)
     for c in range(n_classes):
-        class_attr[c] = raw[train_idx][labels[train_idx] == c].mean(0) >= 0.5
+        idx = train_idx[labels[train_idx] == c]
+        pos = raw[idx].sum(0)
+        neg = ((raw[idx] == 0) & ~not_visible[idx]).sum(0)
+        class_attr[c] = pos >= neg
     keep = np.where(class_attr.sum(0) >= min_classes)[0]
     return keep, class_attr[:, keep]
 
@@ -83,14 +91,14 @@ def main():
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
 
-    paths, is_train, labels, attr_names, raw = load_cub(args.cub_dir)
+    paths, is_train, labels, attr_names, raw, not_visible = load_cub(args.cub_dir)
     rng = np.random.default_rng(args.seed)
     train_all = np.where(is_train)[0]
     rng.shuffle(train_all)
     n_val = int(len(train_all) * args.val_frac)
     splits = {"train": np.sort(train_all[n_val:]), "val": np.sort(train_all[:n_val]), "test": np.where(~is_train)[0]}
 
-    keep, class_concepts = select_concepts(raw, labels, splits["train"])
+    keep, class_concepts = select_concepts(raw, not_visible, labels, splits["train"])
     concept_names = [attr_names[j] for j in keep]
     group_names = sorted({n.split("::")[0] for n in concept_names})
     concept_groups = [group_names.index(n.split("::")[0]) for n in concept_names]

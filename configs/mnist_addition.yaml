@@ -18,6 +18,7 @@ model:
   n_concepts: 20
   n_classes: 19
   encoder: mnist_pair
+  head_hidden_dim: 64
   mode: joint
   concept_weight: 1.0
   lr: 0.001

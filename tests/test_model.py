@@ -31,7 +31,7 @@ def test_training_runs(mode, loss_kwargs):
 def test_sequential_blocks_task_gradient_to_encoder():
     model = ConceptBottleneckModel(
         n_concepts=8, n_classes=5, encoder_kwargs={"in_features": 16, "hidden_dim": 0},
-        mode="sequential", concept_weight=0.0,
+        mode="sequential", concept_weight=0.0, head_hidden_dim=8,
     )
     x, c, y = next(iter(random_loader()))
     model._step((x, c, y), "train").backward()

@@ -35,6 +35,7 @@ class ConceptBottleneckModel(L.LightningModule):
         focal_gamma: float = 2.0,
         label_smoothing: float = 0.0,
         confidence_penalty: float = 0.0,
+        head_hidden_dim: int = 0,
         lr: float = 1e-3,
         weight_decay: float = 0.0,
     ):
@@ -45,7 +46,14 @@ class ConceptBottleneckModel(L.LightningModule):
             raise ValueError("concept_loss must be 'bce' or 'focal'")
         self.save_hyperparameters()
         self.encoder = build_encoder(encoder, n_concepts, **(encoder_kwargs or {}))
-        self.head = nn.Linear(n_concepts, n_classes)
+        # Linear head as in Koh et al.; an MLP head for tasks a linear head learns too slowly
+        # (MNIST-Addition's sum needs very large linear weights).
+        if head_hidden_dim > 0:
+            self.head = nn.Sequential(
+                nn.Linear(n_concepts, head_hidden_dim), nn.ReLU(), nn.Linear(head_hidden_dim, n_classes)
+            )
+        else:
+            self.head = nn.Linear(n_concepts, n_classes)
 
     def forward(self, x):
         """Returns concept logits and task logits (head on predicted concept probabilities)."""
